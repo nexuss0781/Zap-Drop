@@ -310,6 +310,57 @@
     .action-icon.trash { width: 8px; height: 9px; border-radius: 1px 1px 2px 2px; }
     .action-label { width: 20px; height: 3px; border-radius: 4px; background: #5c5d65; opacity: .7; }
 
+    .main-area { position: relative; }
+    .upload-menu {
+      position: absolute;
+      z-index: 5;
+      right: 20px;
+      bottom: 18px;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: flex-end;
+      gap: 10px;
+    }
+    .upload-menu summary { list-style: none; cursor: pointer; }
+    .upload-menu summary::-webkit-details-marker { display: none; }
+    .upload-trigger {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      color: #202127;
+      background: #d2d3d7;
+      border: 1px solid #b7b8bd;
+      border-radius: 50%;
+      box-shadow: 0 5px 16px rgba(0,0,0,.32);
+      transition: background .15s ease, transform .15s ease;
+    }
+    .upload-menu summary:hover .upload-trigger { background: #e1e2e5; transform: translateY(-1px); }
+    .upload-menu summary:focus-visible .upload-trigger { outline: 2px solid #bfc0c5; outline-offset: 3px; }
+    .upload-options {
+      min-width: 190px;
+      padding: 6px;
+      display: grid;
+      gap: 3px;
+      background: #292a30;
+      border: 1px solid #3a3b42;
+      border-radius: 8px;
+      box-shadow: 0 12px 28px rgba(0,0,0,.36);
+    }
+    .upload-option {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 0 10px;
+      color: #c4c5c9;
+      font-size: 12px;
+      letter-spacing: .01em;
+      border-radius: 5px;
+    }
+    .upload-option[aria-disabled="true"] { cursor: default; }
+    .upload-option-icon { width: 16px; height: 16px; display: grid; place-items: center; color: #85868e; }
+
     @media (min-width: 901px) {
       .file-card { padding: 23px 22px 18px; }
       .card-top { height: 20px; }
@@ -439,6 +490,12 @@
       .file-grid { flex: none; gap: 10px; }
       .file-card { height: 154px; padding: 12px 10px 10px; }
       .topbar { padding: 0 18px; }
+      .upload-menu { position: fixed; right: 18px; bottom: calc(62px + 18px + env(safe-area-inset-bottom)); }
+      .upload-trigger { width: 48px; height: 48px; }
+      .upload-options { min-width: 196px; }
+    }
+    @media (max-width: 720px) {
+      .files-content { padding-bottom: 88px; }
     }
     @media (max-width: 390px) {
       .files-content { padding-left: 12px; padding-right: 12px; }
@@ -471,7 +528,7 @@
       </div>
     </aside>
 
-    <section class="main-area" aria-hidden="true">
+    <section class="main-area" aria-label="File workspace">
       <header class="topbar">
         <span class="brand-line"></span>
         <div class="topbar-tools"><span class="tool-dot"></span><span class="tool-dot circle"></span><span class="tool-dot star"></span></div>
@@ -493,6 +550,27 @@
           <article class="file-card"><div class="card-top"><span class="tiny-star"></span><span class="tiny-more"></span></div><span class="file-icon pdf"></span><span class="file-title-skeleton"></span><span class="file-title-skeleton short"></span><span class="card-divider"></span><div class="card-footer"><span class="meta-lines"><i></i><i></i></span><span class="mini-avatars"><i class="mini-avatar"></i></span></div></article>
         </div>
       </div>
+      <details class="upload-menu" open>
+        <summary class="upload-trigger" aria-label="Add files" title="Add files">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </summary>
+        <div class="upload-options" id="upload-options" role="menu" aria-label="Upload options">
+          <div class="upload-option" role="menuitem" aria-disabled="true">
+            <span class="upload-option-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 1.75h5l3 3v9.5H4z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 1.9v3h2.8M8 7v4m-2-2h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span>Upload file</span>
+          </div>
+          <div class="upload-option" role="menuitem" aria-disabled="true">
+            <span class="upload-option-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1.75 4.5h4l1.4 1.4h7.1v7.35H1.75z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 7.2v4m-2-2h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </span>
+            <span>Upload folder</span>
+          </div>
+        </div>
+      </details>
     </section>
 
     <aside class="preview-panel" aria-hidden="true">
