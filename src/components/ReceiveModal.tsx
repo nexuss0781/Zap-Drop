@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Capacitor } from '@capacitor/core';
 import { X, ChevronDown, ChevronUp, AlertCircle, Smartphone, Monitor, QrCode, Wifi } from 'lucide-react';
 import { DeviceProfile, OSPlatform } from '../types';
-import { startReceive, ReceiveProgressInfo } from '../services/receive';
+import { startPeerReceive, startReceive, ReceiveProgressInfo, ReceivedFile } from '../services/receive';
 import { startRadarDiscovery } from '../services/radar';
+import { ZapdropWifi } from '../native/zapdrop-native';
 
 interface ReceiveModalProps {
   isOpen: boolean;
   onClose: () => void;
   myProfile: DeviceProfile;
   peers: DeviceProfile[];
-  onConnectDevice: (device: DeviceProfile) => void;
+  onConnectDevice: (device: DeviceProfile, files?: ReceivedFile[]) => void;
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
 }
@@ -29,6 +31,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [progressInfo, setProgressInfo] = useState<ReceiveProgressInfo | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const isAndroidApp = Capacitor.isNativePlatform();
 
   useEffect(() => {
     if (!isOpen) {
@@ -90,12 +93,12 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
 
   const handleStartQrScan = async () => {
     setIsScanning(true);
-    setStatusMessage('Scanning QR code...');
+    setStatusMessage(isAndroidApp ? 'Scanning Zapdrop QR code...' : 'Scanning QR code...');
     try {
       await startReceive((info) => {
         setProgressInfo(info);
       });
-      setStatusMessage('All files received successfully!');
+      setStatusMessage(isAndroidApp ? 'Drop complete.' : 'All files received successfully!');
       setTimeout(() => {
         onClose();
       }, 1500);
@@ -106,12 +109,39 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
     }
   };
 
-  const handleSelectDevice = (peer: DeviceProfile) => {
+  const handleSelectDevice = async (peer: DeviceProfile) => {
     setConnectingPeerId(peer.id);
-    setTimeout(() => {
-      onConnectDevice(peer);
-      onClose();
-    }, 500);
+    if (peer.isAccessPoint && peer.wifiSsid) {
+      try {
+        setStatusMessage(`Connecting to ${peer.name}…`);
+        await ZapdropWifi.connectToWifi({ ssid: peer.wifiSsid });
+        await ZapdropWifi.stopDiscovery();
+        await ZapdropWifi.startDiscovery();
+        setStatusMessage('Connected. Looking for active Zapdrop devices…');
+        setConnectingPeerId(null);
+      } catch (error) {
+        setStatusMessage((error as Error)?.message || 'Could not join this hotspot. Scan the other device’s Zapdrop QR code to connect securely.');
+        setConnectingPeerId(null);
+      }
+      return;
+    }
+    if (!isAndroidApp) {
+      setTimeout(() => {
+        onConnectDevice(peer);
+        onClose();
+      }, 500);
+      return;
+    }
+    try {
+      setStatusMessage(`Connecting to ${peer.name}…`);
+      const files = await startPeerReceive(peer, (info) => setProgressInfo(info));
+      onConnectDevice(peer, files);
+      setStatusMessage('Drop complete. Saved to Downloads/Zapdrop.');
+      setTimeout(onClose, 1500);
+    } catch (error) {
+      setStatusMessage((error as Error)?.message || 'The connection failed. Scan the Zapdrop QR code or join the same Wi-Fi network.');
+      setConnectingPeerId(null);
+    }
   };
 
   const quadrantOffsets = [
@@ -136,9 +166,9 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
               <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center mx-auto mb-2">
                 <AlertCircle size={18} />
               </div>
-              <h3 className="text-xs font-bold text-white mb-1">Stop Receiving?</h3>
+              <h3 className="text-xs font-bold text-white mb-1">{isAndroidApp ? 'Stop Drop?' : 'Stop Receiving?'}</h3>
               <p className="text-[11px] text-slate-400 mb-3">
-                This will end your radar visibility and stop incoming transfers.
+                {isAndroidApp ? 'This will hide your device and stop incoming Drops.' : 'This will end your radar visibility and stop incoming transfers.'}
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -177,7 +207,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-[#2ee86f] animate-ping" />
-              <span className="text-xs font-bold text-white">Receive Files</span>
+              <span className="text-xs font-bold text-white">{isAndroidApp ? 'Drop Files' : 'Receive Files'}</span>
               <span className="text-[10px] text-slate-400">
                 ({radarDevices.length} nearby)
               </span>
@@ -213,7 +243,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
                 className="w-full py-2.5 rounded-2xl bg-gradient-to-r from-[#22c55e] to-[#39f07c] text-black font-bold text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(46,232,111,0.4)] hover:brightness-110 active:scale-98 transition-all cursor-pointer"
               >
                 <QrCode size={16} className="stroke-[2.5]" />
-                <span>{isScanning ? 'Scanning...' : 'Scan Sender QR Code'}</span>
+                <span>{isScanning ? 'Scanning...' : isAndroidApp ? 'Scan Zapdrop QR Code' : 'Scan Sender QR Code'}</span>
               </button>
 
               {/* Progress info if downloading */}
@@ -312,7 +342,7 @@ export const ReceiveModal: React.FC<ReceiveModalProps> = ({
               </div>
 
               <span className="text-[10px] text-slate-400">
-                Tap a peer to initiate direct connection
+                {isAndroidApp ? 'Tap a hotspot to join, or a Zapdrop device to connect' : 'Tap a peer to initiate direct connection'}
               </span>
             </div>
           )}

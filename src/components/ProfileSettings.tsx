@@ -4,6 +4,7 @@ import { User, Camera, Check, Radio } from 'lucide-react';
 import { DeviceProfile, HotspotState } from '../types';
 import { AVATAR_PRESETS } from '../services/mockNetwork';
 import { setDeviceName, setAvatar } from '../services/device';
+import { AppUpdateCard } from './AppUpdateCard';
 
 interface ProfileSettingsProps {
   myProfile: DeviceProfile;
@@ -180,6 +181,8 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
           Update Hotspot Config
         </button>
       </div>
+
+      <AppUpdateCard />
 
     </div>
   );

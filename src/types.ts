@@ -7,6 +7,11 @@ export interface DeviceProfile {
   os: OSPlatform;
   signalStrength: number;
   status: 'online' | 'busy' | 'pairing';
+  ip?: string;
+  port?: number;
+  token?: string;
+  wifiSsid?: string;
+  isAccessPoint?: boolean;
 }
 
 export type FileCategory = 'all' | 'images' | 'videos' | 'audio' | 'documents' | 'apps' | 'archives';

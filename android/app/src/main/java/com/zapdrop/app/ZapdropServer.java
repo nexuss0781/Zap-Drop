@@ -10,6 +10,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.FileInputStream;
+import java.io.BufferedInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,7 +54,13 @@ public class ZapdropServer extends NanoHTTPD {
         String uri = s.getUri();
 
         if (uri.equals("/manifest")) {
-            return newFixedLengthResponse(Response.Status.OK, "application/json", manifest.toString());
+            try {
+                JSONObject response = new JSONObject();
+                response.put("files", manifest);
+                return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
+            } catch (Exception e) {
+                return text(Response.Status.INTERNAL_ERROR, e.getMessage());
+            }
         }
 
         if (uri.equals("/done")) {
@@ -73,15 +80,21 @@ public class ZapdropServer extends NanoHTTPD {
                 if (pfd == null) {
                     return text(Response.Status.NOT_FOUND, "file descriptor unavailable");
                 }
-                long total = pfd.getStatSize();
-                FileInputStream in = new FileInputStream(pfd.getFileDescriptor());
+                long reportedSize = pfd.getStatSize();
+                final long total = reportedSize > 0 ? reportedSize : f.optLong("size", 0L);
+                if (total <= 0) {
+                    pfd.close();
+                    return text(Response.Status.INTERNAL_ERROR, "File size is unavailable");
+                }
+                FileInputStream rawIn = new FileInputStream(pfd.getFileDescriptor());
 
                 long start = 0;
                 String range = s.getHeaders().get("range");
                 if (range != null && range.startsWith("bytes=")) {
                     start = Long.parseLong(range.substring(6).split("-")[0]);
-                    in.getChannel().position(start);
+                    rawIn.getChannel().position(start);
                 }
+                InputStream in = new BufferedInputStream(rawIn, 256 * 1024);
                 final long from = start;
                 InputStream counting = new FilterInputStream(in) {
                     long sent = from;

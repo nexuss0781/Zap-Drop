@@ -3,6 +3,7 @@ import {
   ActiveTab,
   DeviceFile,
   DeviceProfile,
+  FileCategory,
   HotspotState,
   TransferRecord,
 } from './types';
@@ -21,10 +22,12 @@ import { TransferHistory } from './components/TransferHistory';
 import { ProfileSettings } from './components/ProfileSettings';
 import { SendModal } from './components/SendModal';
 import { ReceiveModal } from './components/ReceiveModal';
+import { ReceivedFile } from './services/receive';
 import { TransferProgressModal } from './components/TransferProgressModal';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { loadFiles } from './services/library';
 
 export default function App() {
   const detectedOs = PlatformBridge.getDetectedOS();
@@ -226,7 +229,43 @@ export default function App() {
   };
 
   // Connect to peer in receive radar
-  const handleConnectDevice = (peer: DeviceProfile) => {
+  const handleConnectDevice = (peer: DeviceProfile, receivedFiles?: ReceivedFile[]) => {
+    if (receivedFiles?.length) {
+      const now = Date.now();
+      const records: TransferRecord[] = receivedFiles.map((file, index) => {
+        let category: FileCategory = 'documents';
+        if (file.mime.startsWith('image/')) category = 'images';
+        else if (file.mime.startsWith('video/')) category = 'videos';
+        else if (file.mime.startsWith('audio/')) category = 'audio';
+        else if (file.mime === 'application/vnd.android.package-archive') category = 'apps';
+        else if (/\.(zip|rar|7z|tar|gz)$/i.test(file.name)) category = 'archives';
+        return {
+          id: `drop-${now}-${index}`,
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.mime,
+          category,
+          senderId: peer.id,
+          senderName: peer.name,
+          senderAvatar: peer.avatar,
+          senderOs: peer.os,
+          receiverId: myProfile.id,
+          receiverName: myProfile.name,
+          receiverAvatar: myProfile.avatar,
+          receiverOs: myProfile.os,
+          direction: 'received' as const,
+          timestamp: now,
+          dateLabel: 'Just now',
+          status: 'completed' as const,
+          progress: 100,
+          speedMbps: 0,
+          filePath: file.uri,
+        };
+      });
+      setTransfers((previous) => [...records, ...previous]);
+      loadFiles('all').then(setFiles).catch(() => {});
+      return;
+    }
     if (selectedFiles.length === 0 && files.length > 0) {
       setSelectedFiles([files[0]]);
     }

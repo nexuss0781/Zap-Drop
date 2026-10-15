@@ -8,6 +8,8 @@ export interface QrPayload {
   token: string;
   name: string;
   deviceId: string;
+  ssid?: string;
+  password?: string;
   files: { id: string; name: string; size: number; mime: string }[];
 }
 

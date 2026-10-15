@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ChevronDown, ChevronUp, AlertCircle, ShieldCheck, Wifi } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, AlertCircle, ShieldCheck, Wifi, Settings } from 'lucide-react';
 import { DeviceFile, DeviceProfile, HotspotState } from '../types';
 import { formatFileSize } from '../services/mockNetwork';
 import { startSend, SendSession } from '../services/send';
+import { ZapdropWifi } from '../native/zapdrop-native';
 
 interface SendModalProps {
   isOpen: boolean;
@@ -28,9 +30,11 @@ export const SendModal: React.FC<SendModalProps> = ({
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [serverIp, setServerIp] = useState<string | null>(null);
   const [serverPort, setServerPort] = useState<number | null>(null);
+  const [sessionSsid, setSessionSsid] = useState<string | null>(null);
   const [transferProgress, setTransferProgress] = useState<{ bytes: number; total: number } | null>(null);
   const [transferDone, setTransferDone] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [startupStatus, setStartupStatus] = useState('Preparing transfer…');
 
   const sessionRef = useRef<SendSession | null>(null);
 
@@ -41,9 +45,11 @@ export const SendModal: React.FC<SendModalProps> = ({
         sessionRef.current = null;
       }
       setQrCodeDataUrl(null);
+      setSessionSsid(null);
       setTransferProgress(null);
       setTransferDone(false);
       setErrorMsg(null);
+      setStartupStatus('Preparing transfer…');
       return;
     }
 
@@ -60,7 +66,10 @@ export const SendModal: React.FC<SendModalProps> = ({
         if (isMounted) {
           setTransferDone(true);
         }
-      }
+      },
+      (status) => {
+        if (isMounted) setStartupStatus(status);
+      },
     )
       .then((session) => {
         if (!isMounted) {
@@ -71,6 +80,8 @@ export const SendModal: React.FC<SendModalProps> = ({
         setQrCodeDataUrl(session.qrCodeUrl);
         setServerIp(session.ip);
         setServerPort(session.port);
+        setSessionSsid(session.ssid);
+        setStartupStatus('Ready to connect. Scan this QR code on the other device.');
       })
       .catch((err) => {
         if (isMounted) {
@@ -162,7 +173,7 @@ export const SendModal: React.FC<SendModalProps> = ({
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-[#2ee86f] animate-pulse" />
               <span className="text-xs font-bold text-white">
-                {transferDone ? 'Transfer Complete' : `Sending ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}`}
+                {transferDone ? (Capacitor.isNativePlatform() ? 'Zap Complete' : 'Transfer Complete') : Capacitor.isNativePlatform() ? `Zapping ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}` : `Sending ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}`}
               </span>
               <span className="text-[10px] text-slate-400">
                 ({formatFileSize(totalSize)})
@@ -196,15 +207,15 @@ export const SendModal: React.FC<SendModalProps> = ({
                 {qrCodeDataUrl ? (
                   <img
                     src={qrCodeDataUrl}
-                    alt="Scan to Receive"
+                    alt={Capacitor.isNativePlatform() ? 'Scan to Drop' : 'Scan to Receive'}
                     className="w-36 h-36 object-contain"
                   />
                 ) : errorMsg ? (
-                  <div className="text-xs text-red-500 p-2">{errorMsg}</div>
+                  <div className="flex flex-col items-center gap-2 p-2 text-xs text-red-500"><AlertCircle size={22} /><span>{errorMsg}</span></div>
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-slate-600">
                     <Wifi size={24} className="animate-pulse" />
-                    <span className="text-[10px]">Starting Server...</span>
+                    <span className="text-[10px]">{startupStatus}</span>
                   </div>
                 )}
               </div>
@@ -232,18 +243,27 @@ export const SendModal: React.FC<SendModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-slate-400">Host IP:</span>
                   <span className="text-[11px] font-mono font-bold text-emerald-400">
-                    {serverIp ? `${serverIp}:${serverPort}` : '192.168.43.1'}
+                    {serverIp ? `${serverIp}:${serverPort}` : 'Waiting for server…'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-slate-400">P2P Network:</span>
-                  <span className="text-[11px] font-medium text-white">{hotspotState.ssid}</span>
+                  <span className="text-[11px] font-medium text-white">{sessionSsid || (!Capacitor.isNativePlatform() ? hotspotState.ssid : 'Waiting for hotspot…')}</span>
                 </div>
               </div>
 
+              {errorMsg && Capacitor.getPlatform() === 'android' && (
+                <button
+                  onClick={() => ZapdropWifi.openHotspotSettings().catch(() => {})}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-2 text-[10px] font-semibold text-slate-200 hover:bg-white/10"
+                >
+                  <Settings size={13} /> Open Android Wi-Fi settings
+                </button>
+              )}
+
               <div className="flex items-center gap-1 text-[10px] text-slate-400">
                 <ShieldCheck size={12} className="text-[#2ee86f]" />
-                <span>Encrypted offline direct peer-to-peer transfer</span>
+                <span>{Capacitor.isNativePlatform() ? 'Offline direct peer-to-peer transfer' : 'Encrypted offline direct peer-to-peer transfer'}</span>
               </div>
             </div>
           )}

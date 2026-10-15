@@ -84,6 +84,7 @@ export async function loadFiles(
         isDirectory: false,
         previewUrl: i.type === 'image' || i.type === 'video' ? Capacitor.convertFileSrc(i.webPath) : undefined,
         extension: ext,
+        nativeUri: i.uri,
       };
     });
   } catch (e) {
